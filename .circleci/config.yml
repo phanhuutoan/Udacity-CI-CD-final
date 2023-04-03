@@ -5,37 +5,38 @@ executors:
       - image: node:14-alpine
 jobs:
   build_frontend:
-    executor: node/default
+    executor: node
     working_directory: ~/project
     steps:
       - checkout
       - run:
-          name: install dependencies
-          command: npm i
+          name: Compile code check
+          command: |
+            cd frontend
+            npm install
+            npm run build
       - save_cache:
           paths:
-            - node_modules
-          key: fe-cache-{{ checksum "frontend/package-lock.json" }}
-      - run:
-          name: Compile code
-          command: npm run build
+            - frontend/node_modules
+          key: fe-cached-{{ checksum "frontend/package-lock.json" }}
   build_backend:
-    executor: node/default
+    executor: node
     working_directory: ~/project
     steps:
       - checkout
       - run:
-          name: install dependencies
-          command: npm i
+          name: Compile code check
+          command: |
+            cd backend
+            npm install
+            npm run build
       - save_cache:
           paths:
-            - node_modules
-          key: be-cache-{{ checksum "backend/package-lock.json" }}
-      - run:
-          name: Compile code
-          command: npm run build
+            - backend/node_modules
+          key: be-cached-{{ checksum "backend/package-lock.json" }}
 
 workflows:
   ci-pipeline:
     jobs:
       - build_frontend
+      - build_backend
