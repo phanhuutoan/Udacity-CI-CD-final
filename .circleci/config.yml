@@ -1,9 +1,23 @@
 version: 2.1
+orbs:
+  slack: circleci/slack@4.12.1
 executors:
   node:
     docker:
       - image: node:14-alpine
 jobs:
+  slack_notify:
+    docker:
+      - image: "cimg/base:stable"
+    steps:
+      - slack/notify:
+          event: fail
+          mentions: "@here"
+          template: basic_fail_1
+      - slack/notify:
+          event: pass
+          template: success_tagged_deploy_1
+
   build_frontend:
     executor: node
     working_directory: ~/project
@@ -89,6 +103,8 @@ jobs:
 workflows:
   ci-pipeline:
     jobs:
+      - slack_notify:
+          context: global
       - build_frontend
       - build_backend
 
