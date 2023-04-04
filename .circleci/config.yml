@@ -18,7 +18,8 @@ jobs:
       - save_cache:
           paths:
             - frontend/node_modules
-          key: fe-cached-{{ checksum "frontend/package.json" }}
+            - frontend/package-lock.json
+          key: fe-caching-{{ checksum "frontend/package.json" }}
   build_backend:
     executor: node
     working_directory: ~/project
@@ -33,7 +34,8 @@ jobs:
       - save_cache:
           paths:
             - backend/node_modules
-          key: be-cached-{{ checksum "backend/package.json" }}
+            - backend/package-lock.json
+          key: be-caching-{{ checksum "backend/package.json" }}
 
   test_frontend:
     executor: node
@@ -41,7 +43,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: fe-cached-{{ checksum "frontend/package.json" }}
+          key: fe-caching-{{ checksum "frontend/package.json" }}
       - run:
           name: Unit testing
           command: |
@@ -53,20 +55,53 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: be-cached-{{ checksum "backend/package.json" }}
+          key: be-caching-{{ checksum "backend/package.json" }}
       - run:
           name: Unit testing
           command: |
             cd backend
             npm run test
+
+  scan_frontend:
+    executor: node
+    working_directory: ~/project
+    steps:
+      - checkout
+      - restore_cache:
+          key: fe-caching-{{ checksum "frontend/package.json" }}
+      - run:
+          name: Scanning frontend
+          command: |
+            cd frontend
+            npm audit --audit-level=critical
+  scan_backend:
+    executor: node
+    working_directory: ~/project
+    steps:
+      - checkout
+      - restore_cache:
+          key: fe-caching-{{ checksum "backend/package.json" }}
+      - run:
+          name: Scanning backend
+          command: |
+            cd backend
+            npm audit --audit-level=critical
 workflows:
   ci-pipeline:
     jobs:
       - build_frontend
       - build_backend
+
       - test_frontend:
           requires:
             - build_frontend
       - test_backend:
+          requires:
+            - build_backend
+
+      - scan_frontend:
+          requires:
+            - build_frontend
+      - scan_backend:
           requires:
             - build_backend
