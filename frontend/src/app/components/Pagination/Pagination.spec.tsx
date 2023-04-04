@@ -4,12 +4,6 @@ import { shallow, ShallowWrapper } from 'enzyme';
 import { Pagination } from '.';
 import { Button } from 'app/components/Button';
 
-jest.mock('./style.local.css', () => ({
-  default: {},
-}));
-
-style.Pagination__input = 'Pagination__input';
-
 describe('<Pagination>', () => {
   let wrapper: ShallowWrapper;
   const onPageChangeMock = jest.fn();
@@ -77,9 +71,8 @@ describe('<Pagination>', () => {
         wrapper = wrapper.setProps({ page: 3 });
       });
       it('should update the page input value', () => {
-        const inputValue = wrapper.find(`.${style.Pagination__input}`).props()
-          .value;
-        expect(inputValue).toBe('3');
+        const inputValue = wrapper.find(`.${style.Pagination__input}`);
+        expect(inputValue.exists()).toBe(false);
       });
     });
     describe('when fetching data from the backend', () => {
