@@ -18,7 +18,7 @@ jobs:
       - save_cache:
           paths:
             - frontend/node_modules
-          key: fe-cached-{{ checksum "frontend/package-lock.json" }}
+          key: fe-cached-{{ checksum "frontend/package.json" }}
   build_backend:
     executor: node
     working_directory: ~/project
@@ -33,10 +33,40 @@ jobs:
       - save_cache:
           paths:
             - backend/node_modules
-          key: be-cached-{{ checksum "backend/package-lock.json" }}
+          key: be-cached-{{ checksum "backend/package.json" }}
 
+  test_frontend:
+    executor: node
+    working_directory: ~/project
+    steps:
+      - checkout
+      - restore_cache:
+          key: fe-cached-{{ checksum "frontend/package.json" }}
+      - run:
+          name: Unit testing
+          command: |
+            cd frontend
+            npm run test
+  test_backend:
+    executor: node
+    working_directory: ~/project
+    steps:
+      - checkout
+      - restore_cache:
+          key: be-cached-{{ checksum "backend/package.json" }}
+      - run:
+          name: Unit testing
+          command: |
+            cd backend
+            npm run test
 workflows:
   ci-pipeline:
     jobs:
       - build_frontend
       - build_backend
+      - test_frontend:
+          requires:
+            - build_frontend
+      - test_backend:
+          requires:
+            - build_backend
