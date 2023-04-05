@@ -195,6 +195,7 @@ jobs:
             chmod +x .circleci/bash/getIpAddress.sh
             echo [web] > .circleci/ansible/inventory.txt
             .circleci/bash/getIpAddress.sh "udapeople-backend-${TEST_BE_STACKNAME:0:7}" >> .circleci/ansible/inventory.txt
+      - run: cat .circleci/ansible/inventory.txt
       - save_cache:
           paths:
             - .circleci/ansible/inventory.txt
@@ -224,7 +225,7 @@ jobs:
       - checkout
       - restore_cache:
           key: inventory-{{ .Revision  }}
-      - run: echo .circleci/ansible/inventory.txt
+      - run: cat .circleci/ansible/inventory.txt
 
 workflows:
   ci-cd-pipeline:
