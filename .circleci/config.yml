@@ -1,23 +1,72 @@
+
 version: 2.1
 orbs:
   slack: circleci/slack@4.12.1
 executors:
   node:
     docker:
-      - image: node:14-alpine
-jobs:
-  slack_notify:
-    docker:
-      - image: "cimg/base:stable"
+      - image: cimg/node:14.21
+commands:
+  slack_notification:
+    description: "A slack notification"
     steps:
       - slack/notify:
+          custom: |
+            {
+              "attachments": [
+                {
+                  "color": "#d50054",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Your CI pipeline is FAILED",
+                        "emoji": true
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "Build pipeline number *${CIRCLE_BUILD_NUM}* is failed. Job is ${CIRCLE_JOB}, please check link here: ${CIRCLE_BUILD_URL}"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
           event: fail
-          mentions: "@here"
-          template: basic_fail_1
+
       - slack/notify:
           event: pass
-          template: success_tagged_deploy_1
+          custom: |
+            {
+              "attachments": [
+                {
+                  "color": "#00d581",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Your CI pipeline is PASSED",
+                        "emoji": true
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "Build pipeline number *${CIRCLE_BUILD_NUM}* is PASSED, check link here: ${CIRCLE_BUILD_URL}"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
 
+jobs:
   build_frontend:
     executor: node
     working_directory: ~/project
@@ -33,7 +82,9 @@ jobs:
           paths:
             - frontend/node_modules
             - frontend/package-lock.json
-          key: fe-caching-{{ checksum "frontend/package.json" }}
+          key: fe-caches-{{ checksum "frontend/package.json" }}
+      - slack_notification
+      
   build_backend:
     executor: node
     working_directory: ~/project
@@ -49,7 +100,8 @@ jobs:
           paths:
             - backend/node_modules
             - backend/package-lock.json
-          key: be-caching-{{ checksum "backend/package.json" }}
+          key: be-caches-{{ checksum "backend/package.json" }}
+      - slack_notification
 
   test_frontend:
     executor: node
@@ -57,7 +109,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: fe-caching-{{ checksum "frontend/package.json" }}
+          key: fe-caches-{{ checksum "frontend/package.json" }}
       - run:
           name: Unit testing
           command: |
@@ -69,7 +121,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: be-caching-{{ checksum "backend/package.json" }}
+          key: be-caches-{{ checksum "backend/package.json" }}
       - run:
           name: Unit testing
           command: |
@@ -82,7 +134,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: fe-caching-{{ checksum "frontend/package.json" }}
+          key: fe-caches-{{ checksum "frontend/package.json" }}
       - run:
           name: Scanning frontend
           command: |
@@ -94,7 +146,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: fe-caching-{{ checksum "backend/package.json" }}
+          key: fe-caches-{{ checksum "backend/package.json" }}
       - run:
           name: Scanning backend
           command: |
@@ -103,14 +155,16 @@ jobs:
 workflows:
   ci-pipeline:
     jobs:
-      - slack_notify:
+      - build_frontend:
           context: global
-      - build_frontend
-      - build_backend
+
+      - build_backend:
+          context: global
 
       - test_frontend:
           requires:
             - build_frontend
+
       - test_backend:
           requires:
             - build_backend
@@ -118,6 +172,8 @@ workflows:
       - scan_frontend:
           requires:
             - build_frontend
+
       - scan_backend:
           requires:
             - build_backend
+
