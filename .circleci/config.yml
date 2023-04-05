@@ -179,22 +179,22 @@ jobs:
     steps:
       - checkout
       - setup_aws
-      - run:
-          name: ensure infrastructure backend
-          command: |
-             aws cloudformation deploy \
-              --template-file .circleci/files/backend.yml \
-                --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-                --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  \
-                --tags project=udapeople
-      - destroy_infra:
-          stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
+      # - run:
+      #     name: ensure infrastructure backend
+      #     command: |
+      #        aws cloudformation deploy \
+      #         --template-file .circleci/files/backend.yml \
+      #           --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+      #           --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  \
+      #           --tags project=udapeople
+      # - destroy_infra:
+      #     stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
       - run:
           name: create inventory
           command: |
             chmod +x .circleci/bash/getIpAddress.sh
             echo [web] > .circleci/ansible/inventory.txt
-            .circleci/bash/getIpAddress.sh "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" >> .circleci/ansible/inventory.txt
+            .circleci/bash/getIpAddress.sh "udapeople-backend-${TEST_BE_STACKNAME:0:7}" >> .circleci/ansible/inventory.txt
       - save_cache:
           paths:
             - .circleci/ansible/inventory.txt
