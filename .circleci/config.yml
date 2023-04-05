@@ -3,6 +3,7 @@ version: 2.1
 orbs:
   slack: circleci/slack@4.12.1
   aws: circleci/aws-cli@3.1.5
+  python: circleci/python@2.0.3
 
 executors:
   node:
@@ -82,7 +83,7 @@ commands:
     steps:
       - run: 
           name: rollback when railed
-          command: aws cloudformation delete-stack --stack-name << prameters.stack_name >>
+          command: aws cloudformation delete-stack --stack-name "<<parameters.stack_name>>"
           when: on_fail
 
 jobs:
@@ -171,55 +172,88 @@ jobs:
             cd backend
             npm audit --audit-level=critical
 
+  # CD section
   deploy_infra_be: 
-    executor: aws-cli/default
+    executor: aws/default
     working_directory: ~/project
     steps:
       - checkout
       - setup_aws
       - run:
-          name: ensure infrastructure
+          name: ensure infrastructure backend
           command: |
              aws cloudformation deploy \
               --template-file .circleci/files/backend.yml \
                 --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
                 --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  \
                 --tags project=udapeople
-      - run: 
-          name: Failed command
-          command: |
-            echo "Ready to failed"
-            exit 1
       - destroy_infra:
           stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
-          
+      - run:
+          name: create inventory
+          command: |
+            chmod +x .circleci/bash/getIpAddress.sh
+            echo [web] > .circleci/ansible/inventory.txt
+            .circleci/bash/getIpAddress.sh "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" >> .circleci/ansible/inventory.txt
+      - save_cache:
+          paths:
+            - .circleci/ansible/inventory.txt
+          key: inventory-{{ .Revision  }}
+  
+  deploy_infra_fe: 
+    executor: aws/default
+    working_directory: ~/project
+    steps:
+      - checkout
+      - setup_aws
+      - run:
+          name: ensure infrastructure frontend
+          command: |
+             aws cloudformation deploy \
+              --template-file .circleci/files/frontend.yml \
+                --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
+                --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  \
+                --tags project=udapeople
+      - destroy_infra:
+          stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
+
+  configure_infrastructure:
+    executor: python/default
+    working_directory: ~/project
+    steps:
+      - checkout
+      - restore_cache:
+          key: inventory-{{ .Revision  }}
+      - run: echo .circleci/ansible/inventory.txt
+
 workflows:
-  ci-pipeline:
+  ci-cd-pipeline:
     jobs:
-      - build_frontend:
-          context: global
-      - build_backend:
-          context: global
+      # - build_frontend:
+      #     context: global
+      # - build_backend:
+      #     context: global
 
-      - test_frontend:
-          requires:
-            - build_frontend
+      # - test_frontend:
+      #     requires:
+      #       - build_frontend
 
-      - test_backend:
-          requires:
-            - build_backend
+      # - test_backend:
+      #     requires:
+      #       - build_backend
 
-      - scan_frontend:
-          requires:
-            - build_frontend
+      # - scan_frontend:
+      #     requires:
+      #       - build_frontend
 
-      - scan_backend:
+      # - scan_backend:
+      #     requires:
+      #       - build_backend
+
+      - deploy_infra_be
+      # - deploy_infra_fe
+
+      - configure_infrastructure:
           requires:
-            - build_backend
-            
-      - deploy_infra_be:
-          requires:
-            - build_backend
-            - test_backend
-            - scan_backend
+            - deploy_infra_be
 
