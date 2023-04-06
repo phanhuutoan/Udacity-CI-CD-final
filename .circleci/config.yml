@@ -265,40 +265,59 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install awscli
-          command: apt install awscli
-      - run:
-          name: setup aws
-          command: |
-            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-            aws configure set region $AWS_DEFAULT_REGION
+          name: Install and setup awscli
+          command: chmod +x .circleci/bash/installAndSetupAws.sh && .circleci/bash/installAndSetupAws.sh
       - restore_cache:
+          name: restore node_modules
+          key: fe-caches-{{ checksum "frontend/package.json" }}
+      - restore_cache:
+          name: restore inventory file
           keys:
-            - fe-caches-{{ checksum "frontend/package.json" }}
             - inventory-{{ .Revision  }}
+            - inventory-
       - run:
           name: export env
           command: |
             export BACKEND_IP=$(cat .circleci/ansible/inventory.txt | tail -n 1)
             export API_URL="http://${BACKEND_IP}:3030"
-            echo "API_URL = ${API_URL}"
             echo API_URL="http://${BACKEND_IP}:3030" >> frontend/.env
-            cat frontend/.env
       - run:
           name: Build frontend and deploy s3
+          # TODO: Change evn TEST WORKFLOW and uncomment destroy
           command: |
             cd frontend
             npm run build
-            tar -czvf artifact-"${TEST_FE_STACK_ID:0:7}".tar.gz dist
-            aws s3 cp dist s3://udapeople-${TEST_FE_STACK_ID:0:7} --recursive
-      - destroy_infra:
-          stack_name: udapeople-frontend-${TEST_FE_STACK_ID:0:7}
+            tar -czvf artifact-"${TEST_WORKFLOW_ID:0:7}".tar.gz dist
+            aws s3 cp dist s3://udapeople-${TEST_WORKFLOW_ID:0:7} --recursive
+      # - destroy_infra:
+      #     stack_name: udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
+
+  deploy_backend:
+    executor: node
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints:
+            - 7b:ca:8b:80:da:31:3b:d2:81:70:ff:eb:66:17:70:1d
+      - restore_cache:
+          keys:
+            - inventory-{{ .Revision  }}
+            - inventory-
+      - run:
+          name: install ansible
+          command: python install --user ansible
+      - run:
+          name: create artifact
+          command: tar -C backend -czvf .circleci/ansible/roles/deploy/artifact/artifact.tar.gz .
+      - run:
+          name: Start backend with ansible
+          command: ansible-playbook -i .circleci/ansible/inventory.txt .circleci/ansible/deploy-backend.yml
+
 workflows:
   ci-cd-pipeline:
     jobs:
-      - build_frontend:
-          context: global
+      # - build_frontend:
+      #     context: global
       # - build_backend:
       #     context: global
 
@@ -320,14 +339,16 @@ workflows:
 
       - deploy_infra_be
       # - deploy_infra_fe
-      - configure_infrastructure:
-          requires:
-            - deploy_infra_be
+      # - configure_infrastructure:
+      #     requires:
+      #       - deploy_infra_be
       # - run-migration:
       #     requires:
       #       - deploy_infra_be
+      # - deploy_frontend:
+      # requires:
+      #   - deploy_infra_fe
 
-      - deploy_frontend:
+      - deploy_backend:
           requires:
-            - build_frontend
-            - configure_infrastructure
+            - deploy_infra_be

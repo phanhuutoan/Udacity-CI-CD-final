@@ -1,0 +1,10 @@
+---
+- name: Unarchive artifact
+  unarchive:
+    src: ../artifact/artifact.tar.gz
+    dest: /home/ubuntu
+- name: Start app
+  shell: |
+    npm install
+    pm2 stop default
+    pm2 start npm -- start
