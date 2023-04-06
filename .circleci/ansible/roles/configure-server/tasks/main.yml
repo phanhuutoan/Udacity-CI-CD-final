@@ -1,21 +1,21 @@
 ---
-  - name: Install the gpg key for nodejs LTS
-    apt_key:
-      url: "https://deb.nodesource.com/gpgkey/nodesource.gpg.key"
-      state: present
-      
-  - name: Install the nodejs {{ NODEJS_VERSION }} LTS repos
-    apt_repository:
-      repo: "deb https://deb.nodesource.com/node_{{ NODEJS_VERSION }}.x bionic main"
-      state: present
-      update_cache: yes
+- name: Install the gpg key for nodejs LTS
+  apt_key:
+    url: "https://deb.nodesource.com/gpgkey/nodesource.gpg.key"
+    state: present
 
-  - name: Install the nodejs
-    apt:
-      name: nodejs
-      state: present 
+- name: Install the nodejs {{ NODEJS_VERSION }} LTS repos
+  apt_repository:
+    repo: "deb https://deb.nodesource.com/node_{{ NODEJS_VERSION }} bionic main"
+    state: present
+    update_cache: yes
 
-  - name: Install the PM2 at global scope
-    npm:
-      name: pm2
-      global: yes
+- name: Install the nodejs
+  apt:
+    name: nodejs
+    state: present
+
+- name: Install the PM2 at global scope
+  npm:
+    name: pm2
+    global: yes

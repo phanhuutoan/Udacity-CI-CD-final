@@ -1,14 +1,13 @@
-
 version: 2.1
 orbs:
   slack: circleci/slack@4.12.1
   aws: circleci/aws-cli@3.1.5
-  python: circleci/python@2.0.3
+  python: circleci/python@2.1.1
 
 executors:
   node:
     docker:
-      - image: cimg/node:14.21
+      - image: cimg/node:13.8.0
 commands:
   slack_notification:
     description: "A slack notification"
@@ -68,23 +67,32 @@ commands:
                 }
               ]
             }
-  setup_aws: 
+  setup_aws:
     description: setup aws
     steps:
       - aws/setup:
           aws-access-key-id: AWS_ACCESS_KEY_ID
           aws-secret-access-key: AWS_SECRET_ACCESS_KEY
           aws-region: AWS_DEFAULT_REGION
-  destroy_infra: 
+  destroy_infra:
     description: using for rollback creating infra
     parameters:
       stack_name:
         type: string
     steps:
-      - run: 
+      - run:
           name: rollback when railed
           command: aws cloudformation delete-stack --stack-name "<<parameters.stack_name>>"
           when: on_fail
+  revert_migration_when_failed:
+    description: Revert the last migration if successfully run in the current workflow.
+    steps:
+      - run:
+          name: Revert migrations
+          command: |
+            cd backend
+            chmod +x runRevertMigration.sh 
+            ./runRevertMigration.sh
 
 jobs:
   build_frontend:
@@ -103,7 +111,7 @@ jobs:
             - frontend/node_modules
             - frontend/package-lock.json
           key: fe-caches-{{ checksum "frontend/package.json" }}
-      - slack_notification    
+      - slack_notification
   build_backend:
     executor: node
     working_directory: ~/project
@@ -165,7 +173,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: fe-caches-{{ checksum "backend/package.json" }}
+          key: be-caches-{{ checksum "backend/package.json" }}
       - run:
           name: Scanning backend
           command: |
@@ -173,7 +181,7 @@ jobs:
             npm audit --audit-level=critical
 
   # CD section
-  deploy_infra_be: 
+  deploy_infra_be:
     executor: aws/default
     working_directory: ~/project
     steps:
@@ -189,6 +197,7 @@ jobs:
       #           --tags project=udapeople
       # - destroy_infra:
       #     stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
+      # TODO: need to change env TEST_BE_STACKNAME
       - run:
           name: create inventory
           command: |
@@ -200,8 +209,8 @@ jobs:
           paths:
             - .circleci/ansible/inventory.txt
           key: inventory-{{ .Revision  }}
-  
-  deploy_infra_fe: 
+
+  deploy_infra_fe:
     executor: aws/default
     working_directory: ~/project
     steps:
@@ -210,11 +219,11 @@ jobs:
       - run:
           name: ensure infrastructure frontend
           command: |
-             aws cloudformation deploy \
-              --template-file .circleci/files/frontend.yml \
-                --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
-                --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  \
-                --tags project=udapeople
+            aws cloudformation deploy \
+             --template-file .circleci/files/frontend.yml \
+               --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
+               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  \
+               --tags project=udapeople
       - destroy_infra:
           stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
 
@@ -228,19 +237,68 @@ jobs:
             - 7b:ca:8b:80:da:31:3b:d2:81:70:ff:eb:66:17:70:1d
       - restore_cache:
           key: inventory-{{ .Revision  }}
-      - run: 
+      - run:
           name: install ansible
           command: pip install --user ansible
       - run:
           name: configure with ansible
           command: ansible-playbook -i .circleci/ansible/inventory.txt .circleci/ansible/configure-server.yml
-      
+  run-migration:
+    executor: node
+    steps:
+      - checkout
+      - restore_cache:
+          key: be-caches-{{ checksum "backend/package.json" }}
+      - run:
+          name: Run migration
+          command: |
+            cd backend
+            npm run migrations > migrations_dump.txt
+            cat migrations_dump.txt
+      - run:
+          name: send migration status to kvdb
+          command: chmod +x .circleci/bash/sendMigrationResult.sh && .circleci/bash/sendMigrationResult.sh
+      - revert_migration_when_failed
 
+  deploy_frontend:
+    executor: node
+    steps:
+      - checkout
+      - run:
+          name: Install awscli
+          command: apt install awscli
+      - run:
+          name: setup aws
+          command: |
+            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
+            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
+            aws configure set region $AWS_DEFAULT_REGION
+      - restore_cache:
+          keys:
+            - fe-caches-{{ checksum "frontend/package.json" }}
+            - inventory-{{ .Revision  }}
+      - run:
+          name: export env
+          command: |
+            export BACKEND_IP=$(cat .circleci/ansible/inventory.txt | tail -n 1)
+            export API_URL="http://${BACKEND_IP}:3030"
+            echo "API_URL = ${API_URL}"
+            echo API_URL="http://${BACKEND_IP}:3030" >> frontend/.env
+            cat frontend/.env
+      - run:
+          name: Build frontend and deploy s3
+          command: |
+            cd frontend
+            npm run build
+            tar -czvf artifact-"${TEST_FE_STACK_ID:0:7}".tar.gz dist
+            aws s3 cp dist s3://udapeople-${TEST_FE_STACK_ID:0:7} --recursive
+      - destroy_infra:
+          stack_name: udapeople-frontend-${TEST_FE_STACK_ID:0:7}
 workflows:
   ci-cd-pipeline:
     jobs:
-      # - build_frontend:
-      #     context: global
+      - build_frontend:
+          context: global
       # - build_backend:
       #     context: global
 
@@ -262,8 +320,14 @@ workflows:
 
       - deploy_infra_be
       # - deploy_infra_fe
-
       - configure_infrastructure:
           requires:
             - deploy_infra_be
+      # - run-migration:
+      #     requires:
+      #       - deploy_infra_be
 
+      - deploy_frontend:
+          requires:
+            - build_frontend
+            - configure_infrastructure
