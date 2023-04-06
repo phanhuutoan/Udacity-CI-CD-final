@@ -223,9 +223,18 @@ jobs:
     working_directory: ~/project
     steps:
       - checkout
+      - add_ssh_keys:
+          fingerprints:
+            - 7b:ca:8b:80:da:31:3b:d2:81:70:ff:eb:66:17:70:1d
       - restore_cache:
           key: inventory-{{ .Revision  }}
-      - run: cat .circleci/ansible/inventory.txt
+      - run: 
+          name: install ansible
+          command: pip install --user ansible
+      - run:
+          name: configure with ansible
+          command: ansible-playbook -i .circleci/ansible/inventory.txt .circleci/ansible/configure-server.yml
+      
 
 workflows:
   ci-cd-pipeline:
