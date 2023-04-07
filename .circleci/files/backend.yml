@@ -40,5 +40,5 @@ Outputs:
   EC2Instance:
     Description: Instance Id
     Value: !Ref EC2Instance
-    Export: 
-      Name: EC2InstanceId
+    Export:
+      Name: !Sub EC2InstanceId-${ID}

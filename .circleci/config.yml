@@ -195,8 +195,9 @@ jobs:
                --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
                --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  \
                --tags project=udapeople
-      - destroy_infra:
-          stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
+      # AWS not auto rollback when failed
+      # - destroy_infra:
+      #     stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
       # TODO: need to change env TEST_BE_STACKNAME
       - run:
           name: create inventory
@@ -300,6 +301,7 @@ jobs:
           fingerprints:
             - 7b:ca:8b:80:da:31:3b:d2:81:70:ff:eb:66:17:70:1d
       - restore_cache:
+          name: restore inventory
           keys:
             - inventory-{{ .Revision  }}
             - inventory-

@@ -12,11 +12,20 @@
     repo: "deb https://deb.nodesource.com/node_{{ NODEJS_VERSION }} bionic main"
     state: present
     update_cache: yes
+
+- name: Remove nodesource
+  file:
+    path: /etc/apt/sources.list.d/deb_nodesource_com_node_13_x.list
+    state: absent
+
 - name: Install the nodejs
   apt:
     name: nodejs
     state: present
-
+- name: Install the npm
+  apt:
+    name: npm
+    state: present
 - name: Install the PM2 at global scope
   npm:
     name: pm2
