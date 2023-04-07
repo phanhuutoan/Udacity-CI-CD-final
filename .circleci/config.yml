@@ -187,23 +187,23 @@ jobs:
     steps:
       - checkout
       - setup_aws
-      # - run:
-      #     name: ensure infrastructure backend
-      #     command: |
-      #        aws cloudformation deploy \
-      #         --template-file .circleci/files/backend.yml \
-      #           --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
-      #           --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  \
-      #           --tags project=udapeople
-      # - destroy_infra:
-      #     stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
+      - run:
+          name: ensure infrastructure backend
+          command: |
+            aws cloudformation deploy \
+             --template-file .circleci/files/backend.yml \
+               --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
+               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  \
+               --tags project=udapeople
+      - destroy_infra:
+          stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
       # TODO: need to change env TEST_BE_STACKNAME
       - run:
           name: create inventory
           command: |
             chmod +x .circleci/bash/getIpAddress.sh
             echo [web] > .circleci/ansible/inventory.txt
-            .circleci/bash/getIpAddress.sh "udapeople-backend-${TEST_BE_STACKNAME:0:7}" >> .circleci/ansible/inventory.txt
+            .circleci/bash/getIpAddress.sh "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" >> .circleci/ansible/inventory.txt
       - run: cat .circleci/ansible/inventory.txt
       - save_cache:
           paths:
@@ -293,7 +293,7 @@ jobs:
       #     stack_name: udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
 
   deploy_backend:
-    executor: node
+    executor: python/default
     steps:
       - checkout
       - add_ssh_keys:
@@ -305,7 +305,7 @@ jobs:
             - inventory-
       - run:
           name: install ansible
-          command: python install --user ansible
+          command: pip install --user ansible
       - run:
           name: create artifact
           command: tar -C backend -czvf .circleci/ansible/roles/deploy/artifact/artifact.tar.gz .
@@ -339,16 +339,15 @@ workflows:
 
       - deploy_infra_be
       # - deploy_infra_fe
-      # - configure_infrastructure:
-      #     requires:
-      #       - deploy_infra_be
-      # - run-migration:
-      #     requires:
-      #       - deploy_infra_be
+      - configure_infrastructure:
+          requires:
+            - deploy_infra_be
+      - run-migration:
+          requires: []
       # - deploy_frontend:
-      # requires:
-      #   - deploy_infra_fe
+      #     requires:
+      #       - deploy_infra_fe
 
       - deploy_backend:
           requires:
-            - deploy_infra_be
+            - configure_infrastructure
