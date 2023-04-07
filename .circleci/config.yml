@@ -74,25 +74,41 @@ commands:
           aws-access-key-id: AWS_ACCESS_KEY_ID
           aws-secret-access-key: AWS_SECRET_ACCESS_KEY
           aws-region: AWS_DEFAULT_REGION
-  destroy_infra:
-    description: using for rollback creating infra
+  destroy_infra_fe:
+    description: using for rollback creating fe infra
+    parameters:
+      id:
+        type: string
+    steps:
+      - run:
+          name: delete all aws s3 files
+          command: aws s3 rm s3://udapeople-<< parameters.id >> --recursive
+          when: on_fail
+      - run:
+          name: delete frontend stack
+          command: aws cloudformation delete-stack --stack-name udapeople-frontend-<< parameters.id >>
+          when: on_fail
+  destroy_infra_be:
+    description: using for rollback creating be infra
     parameters:
       stack_name:
         type: string
     steps:
       - run:
-          name: rollback when railed
+          name: destroy stack <<parameters.stack_name>>
           command: aws cloudformation delete-stack --stack-name "<<parameters.stack_name>>"
           when: on_fail
   revert_migration_when_failed:
     description: Revert the last migration if successfully run in the current workflow.
+    parameters:
+      force_revert:
+        type: boolean
+        default: false
     steps:
       - run:
           name: Revert migrations
-          command: |
-            cd backend
-            chmod +x runRevertMigration.sh 
-            ./runRevertMigration.sh
+          command: chmod +x backend/runRevertMigration.sh && backend/runRevertMigration.sh << parameters.force_revert >>
+          when: always
 
 jobs:
   build_frontend:
@@ -196,7 +212,7 @@ jobs:
                --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  \
                --tags project=udapeople
       # AWS not auto rollback when failed
-      # - destroy_infra:
+      # - destroy_infra_be:
       #     stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
       # TODO: need to change env TEST_BE_STACKNAME
       - run:
@@ -225,7 +241,7 @@ jobs:
                --stack-name "udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}" \
                --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  \
                --tags project=udapeople
-      - destroy_infra:
+      - destroy_infra_be:
           stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
 
   configure_infrastructure:
@@ -290,7 +306,7 @@ jobs:
             npm run build
             tar -czvf artifact-"${TEST_WORKFLOW_ID:0:7}".tar.gz dist
             aws s3 cp dist s3://udapeople-${TEST_WORKFLOW_ID:0:7} --recursive
-      # - destroy_infra:
+      # - destroy_infra_be:
       #     stack_name: udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
 
   deploy_backend:
@@ -315,6 +331,35 @@ jobs:
           name: Start backend with ansible
           command: ansible-playbook -i .circleci/ansible/inventory.txt .circleci/ansible/deploy-backend.yml
 
+  smoke_test:
+    executor: node
+    steps:
+      - checkout
+      - run:
+          name: install and setup aws
+          command: chmod +x .circleci/bash/installAndSetupAws.sh && .circleci/bash/installAndSetupAws.sh
+      - restore_cache:
+          name: restore inventory
+          keys:
+            - inventory-{{ .Revision  }}
+            - inventory-
+      - restore_cache:
+          name: restore node_modules
+          keys:
+            - be-caches-{{ checksum "backend/package.json" }}
+      - run:
+          name: BE smoke test
+          command: chmod +x .circleci/bash/beSmokeTest.sh && .circleci/bash/beSmokeTest.sh
+      - run:
+          name: FE smoke test
+          command: chmod +x .circleci/bash/feSmokeTest.sh && .circleci/bash/feSmokeTest.sh $FE_WORKFLOW_TEST_ID
+      - revert_migration_when_failed:
+          force_revert: true
+      #   # TODO: Change to workflow ID
+      - destroy_infra_be:
+          stack_name: udapeople-backend-${BE_WORKFLOW_TEST_ID:0:7}
+      - destroy_infra_fe:
+          id: ${FE_WORKFLOW_TEST_ID:0:7}
 workflows:
   ci-cd-pipeline:
     jobs:
@@ -339,17 +384,19 @@ workflows:
       #     requires:
       #       - build_backend
 
-      - deploy_infra_be
+      # - deploy_infra_be
       # - deploy_infra_fe
-      - configure_infrastructure:
-          requires:
-            - deploy_infra_be
-      - run-migration:
-          requires: []
+      # - configure_infrastructure:
+      #     requires:
+      #       - deploy_infra_be
+      # - run-migration:
+      #     requires: []
       # - deploy_frontend:
       #     requires:
       #       - deploy_infra_fe
 
-      - deploy_backend:
-          requires:
-            - configure_infrastructure
+      # - deploy_backend:
+      #     requires:
+      #       - configure_infrastructure
+
+      - smoke_test
