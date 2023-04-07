@@ -68,3 +68,4 @@ node_modules
 
 .env
 dist
+.circleci/ansible/roles/deploy/artifact/artifact.tar.gz

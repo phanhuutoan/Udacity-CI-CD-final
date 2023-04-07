@@ -7,6 +7,8 @@
   unarchive:
     src: ../artifact/artifact.tar.gz
     dest: /home/ubuntu/project
+- name: Copy env file
+  shell: cp /tmp/.env /home/ubuntu/project
 - name: Start app
   shell: |
     cd project

@@ -1,4 +1,7 @@
 ---
+- name: set env to .env
+  script: ../bash/generateProductionEnv.sh
+
 - name: Install the gpg key for nodejs LTS
   apt_key:
     url: "https://deb.nodesource.com/gpgkey/nodesource.gpg.key"
@@ -9,7 +12,6 @@
     repo: "deb https://deb.nodesource.com/node_{{ NODEJS_VERSION }} bionic main"
     state: present
     update_cache: yes
-
 - name: Install the nodejs
   apt:
     name: nodejs
