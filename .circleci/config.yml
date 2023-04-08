@@ -108,7 +108,7 @@ commands:
       - run:
           name: Revert migrations
           command: chmod +x backend/runRevertMigration.sh && backend/runRevertMigration.sh << parameters.force_revert >>
-          when: always
+          when: on_fail
 
 jobs:
   build_frontend:
@@ -317,6 +317,10 @@ jobs:
           keys:
             - inventory-{{ .Revision  }}
             - inventory-
+      - restore_cache:
+          name: restore node_modules
+          keys:
+            - be-caches-{{ checksum "backend/package.json" }}
       - run:
           name: install ansible
           command: pip install --user ansible
@@ -355,6 +359,28 @@ jobs:
           stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
       - destroy_infra_fe:
           id: ${CIRCLE_WORKFLOW_ID:0:7}
+
+  cloudfront_update:
+    executor: aws/default
+    steps:
+      - checkout
+      - setup_aws
+      - run:
+          name: Switch cloudfront to new frontend
+          command: |
+            aws cloudformation deploy \
+              --template-file .circleci/files/cloudfront.yml \
+              --stack-name InitialStack \
+              --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID:0:7}" \
+              --tags project=udapeople
+  cleanup:
+    executor: aws/default
+    steps:
+      - checkout
+      - setup_aws
+      - run:
+          name: Clean up previous stack
+          command: chmod +x .circleci/bash/deletePreviousStack.sh && .circleci/bash/deletePreviousStack.sh
 workflows:
   ci-cd-pipeline:
     jobs:
@@ -397,3 +423,9 @@ workflows:
           requires:
             - deploy_frontend
             - deploy_backend
+      - cloudfront_update:
+          requires:
+            - smoke_test
+      - cleanup:
+          requires:
+            - smoke_test
