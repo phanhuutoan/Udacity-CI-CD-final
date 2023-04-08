@@ -211,10 +211,9 @@ jobs:
                --stack-name "udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}" \
                --parameter-overrides ID="${CIRCLE_WORKFLOW_ID:0:7}"  \
                --tags project=udapeople
-      # AWS not auto rollback when failed
-      # - destroy_infra_be:
-      #     stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
-      # TODO: need to change env TEST_BE_STACKNAME
+      # AWS auto rollback when failed
+      - destroy_infra_be:
+          stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
       - run:
           name: create inventory
           command: |
@@ -300,14 +299,11 @@ jobs:
             echo API_URL="http://${BACKEND_IP}:3030" >> frontend/.env
       - run:
           name: Build frontend and deploy s3
-          # TODO: Change evn TEST WORKFLOW and uncomment destroy
           command: |
             cd frontend
             npm run build
-            tar -czvf artifact-"${TEST_WORKFLOW_ID:0:7}".tar.gz dist
-            aws s3 cp dist s3://udapeople-${TEST_WORKFLOW_ID:0:7} --recursive
-      # - destroy_infra_be:
-      #     stack_name: udapeople-frontend-${CIRCLE_WORKFLOW_ID:0:7}
+            tar -czvf artifact-"${CIRCLE_WORKFLOW_ID:0:7}".tar.gz dist
+            aws s3 cp dist s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} --recursive
 
   deploy_backend:
     executor: python/default
@@ -352,14 +348,13 @@ jobs:
           command: chmod +x .circleci/bash/beSmokeTest.sh && .circleci/bash/beSmokeTest.sh
       - run:
           name: FE smoke test
-          command: chmod +x .circleci/bash/feSmokeTest.sh && .circleci/bash/feSmokeTest.sh $FE_WORKFLOW_TEST_ID
+          command: chmod +x .circleci/bash/feSmokeTest.sh && .circleci/bash/feSmokeTest.sh $CIRCLE_WORKFLOW_ID
       - revert_migration_when_failed:
           force_revert: true
-      #   # TODO: Change to workflow ID
       - destroy_infra_be:
-          stack_name: udapeople-backend-${BE_WORKFLOW_TEST_ID:0:7}
+          stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
       - destroy_infra_fe:
-          id: ${FE_WORKFLOW_TEST_ID:0:7}
+          id: ${CIRCLE_WORKFLOW_ID:0:7}
 workflows:
   ci-cd-pipeline:
     jobs:
@@ -384,19 +379,21 @@ workflows:
       #     requires:
       #       - build_backend
 
-      # - deploy_infra_be
-      # - deploy_infra_fe
-      # - configure_infrastructure:
-      #     requires:
-      #       - deploy_infra_be
-      # - run-migration:
-      #     requires: []
-      # - deploy_frontend:
-      #     requires:
-      #       - deploy_infra_fe
+      - deploy_infra_be
+      - deploy_infra_fe
+      - configure_infrastructure:
+          requires:
+            - deploy_infra_be
+      - run-migration
+      - deploy_frontend:
+          requires:
+            - deploy_infra_fe
 
-      # - deploy_backend:
-      #     requires:
-      #       - configure_infrastructure
+      - deploy_backend:
+          requires:
+            - configure_infrastructure
 
-      - smoke_test
+      - smoke_test:
+          requires:
+            - deploy_frontend
+            - deploy_backend
