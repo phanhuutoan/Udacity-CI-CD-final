@@ -265,6 +265,22 @@ jobs:
       - run:
           name: configure with ansible
           command: ansible-playbook -i .circleci/ansible/inventory.txt .circleci/ansible/configure-server.yml
+  configure_node_exporter:
+    executor: python/default
+    steps:
+      - checkout
+      - add_ssh_keys:
+          fingerprints:
+            - 7b:ca:8b:80:da:31:3b:d2:81:70:ff:eb:66:17:70:1d
+      - restore_cache:
+          key: inventory-{{ .Revision  }}
+      - run:
+          name: install ansible
+          command: pip install --user ansible
+      - run:
+          name: install exporter
+          command: ansible-playbook -i .circleci/ansible/inventory.txt .circleci/ansible/install-exporter.yml
+
   run-migration:
     executor: node
     steps:
@@ -303,7 +319,6 @@ jobs:
             export BACKEND_IP=$(cat .circleci/ansible/inventory.txt | tail -n 1)
             export API_URL="http://${BACKEND_IP}:3030"
             echo API_URL="http://${BACKEND_IP}:3030" >> frontend/.env
-            echo frontend/.env
       - run:
           name: Build frontend and deploy s3
           command: |
@@ -432,6 +447,11 @@ workflows:
             - ready_for_deploy
 
       - configure_infrastructure:
+          <<: *filter_master
+          requires:
+            - deploy_infra_be
+
+      - configure_node_exporter:
           <<: *filter_master
           requires:
             - deploy_infra_be
