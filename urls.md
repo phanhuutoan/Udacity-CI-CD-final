@@ -1,8 +1,9 @@
 ## My Udacity project 3
 Using circle CI for building CICD pipeline
-1. url01: CICD pipeline https://app.circleci.com/pipelines/github/phanhuutoan/Udacity-CI-CD-final - _you can ask me to add you to the pipeline as a member_
-2. url02: S3 bucket: http://udapeople-dc6da86.s3-website-us-east-1.amazonaws.com
-3. url03: https://d3q4ws26oavldg.cloudfront.net
-4. url04: http://44.207.3.79:3030/api/status 
+1. url01: https://github.com/phanhuutoan/Udacity-CI-CD-final - _you can ask me to add you to the pipeline as a member_
+2. url02: S3 bucket: http://udapeople-ad292ad.s3-website-us-east-1.amazonaws.com _REPLACABLE_
+3. url03: http://d3q4ws26oavldg.cloudfront.net 
+4. url04: http://3.84.47.253:3030/api/status _REPLACABLE_
+5. url_prometheus: http://18.212.97.62:9090/
 
-**NOTE: Cloudfront uses SSL connection, so it block all un-secured (noSSL) connection. To use the web smoothly (full functionality) we should use S3 link provided above instead of using cloudfront link, it's only used for demo purpose**
+**NOTE: I don't know why cloudfront keep caching the old content, meanwhile the S3 link works pretty well. you can see the images in URL03_SCREENSHOT**

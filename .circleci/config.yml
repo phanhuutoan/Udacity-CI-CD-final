@@ -265,6 +265,8 @@ jobs:
       - run:
           name: configure with ansible
           command: ansible-playbook -i .circleci/ansible/inventory.txt .circleci/ansible/configure-server.yml
+      - destroy_infra_be:
+          stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
   configure_node_exporter:
     executor: python/default
     steps:
@@ -326,6 +328,8 @@ jobs:
             npm run build
             tar -czvf artifact-"${CIRCLE_WORKFLOW_ID:0:7}".tar.gz dist
             aws s3 cp dist s3://udapeople-${CIRCLE_WORKFLOW_ID:0:7} --recursive
+      - destroy_infra_fe:
+          id: ${CIRCLE_WORKFLOW_ID:0:7}
 
   deploy_backend:
     executor: python/default
@@ -352,6 +356,8 @@ jobs:
       - run:
           name: Start backend with ansible
           command: ansible-playbook -i .circleci/ansible/inventory.txt .circleci/ansible/deploy-backend.yml
+      - destroy_infra_be:
+          stack_name: udapeople-backend-${CIRCLE_WORKFLOW_ID:0:7}
 
   smoke_test:
     executor: node
@@ -444,7 +450,7 @@ workflows:
       - deploy_infra_fe:
           <<: *filter_master
           requires:
-            - ready_for_deploy
+            - deploy_infra_be
 
       - configure_infrastructure:
           <<: *filter_master
